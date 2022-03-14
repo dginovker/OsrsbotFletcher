@@ -90,10 +90,10 @@ dependencies {
     testImplementation group: 'net.runelite', name:'jshell', version: runeLiteVersion
     //We want these both at compile and at runtime.
     //So we use implementation instead of compileOnly or runtimeOnly
-    //implementation project(":OSRSBot")
-    implementation group: 'com.github.OSRSB', name: 'OsrsBot', version: osrsbotVersion
-    //implementation project(":DaxWalkerRSB")\
-    implementation group: 'com.github.OSRSB', name: 'DaxWalkerRSB', version: daxWalkerVersion
+    implementation project(":OSRSBot")
+    //implementation group: 'com.github.OSRSB', name: 'OsrsBot', version: osrsbotVersion
+    implementation project(":DaxWalkerRSB")
+    //implementation group: 'com.github.OSRSB', name: 'DaxWalkerRSB', version: daxWalkerVersion
 }
 
 group = 'osrsb'
