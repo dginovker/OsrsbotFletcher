@@ -8,12 +8,14 @@ import rsb.wrappers.RSObject;
 import rsb.wrappers.RSTile;
 
 import java.awt.*;
+import java.util.Arrays;
+import java.util.Locale;
 
 
-@ScriptManifest(authors = { "dginovker" }, name = "Falador Tree Patch Cutter", version = 1.01, description = "<html><head>"
+@ScriptManifest(authors = { "dginovker" }, name = "Falador Tree Patch Cutter", version = 1.04, description = "<html><head>"
         + "</head><body>"
-        + "<center><strong><h2>dginovker's Goblin Killer</h2></strong></center>"
-        + "<center><strong>Start the script near Goblins<br />"
+        + "<center><strong><h2>dginovker's Falador Tree Patch Cutter</h2></strong></center>"
+        + "<center><strong>Start the script in Falador by the Tree Patch with an axe and a tree ready<br />"
         + "</body></html>")
 public class FaladorTreePatchCutter extends Script implements PaintListener {
     private long startTime;
@@ -30,6 +32,7 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
         walkingToPatch,
         waitingForTree,
         afkingBeforeCuttingTree,
+        clickingTree,
         cuttingTree,
         unknown
     }
@@ -39,10 +42,17 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
 
     private final RSArea outsideBank = new RSArea(new RSTile(3008, 3362), new RSTile(3012, 3360));
     private final RSTile treeTile = new RSTile(3004, 3373);
+    private final int treePatchId = 8389;
+    private final int[] treeInPatchVarbits = {
+            46 // yew tree
+    };
     private int startXP = 0;
     private int startLvl = 0;
 
     private State getState() {
+        if (players.getMyPlayer().getAnimation() == 867) {
+            return State.cuttingTree;
+        }
         if (getTree() == null && Inventory.methods.inventory.getCount() > 20 || Inventory.methods.inventory.getCount() >= 28) {
             return State.goingToBank;
         }
@@ -58,11 +68,11 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
         if (getTree() == null && MethodProvider.methods.calc.distanceTo(treeTile) <= 5) {
             return State.waitingForTree;
         }
+        if (lastState == State.afkingBeforeCuttingTree && getTree() != null) {
+            return State.clickingTree;
+        }
         if (getTree() != null && MethodProvider.methods.calc.distanceTo(treeTile) <= 5) {
             return State.afkingBeforeCuttingTree;
-        }
-        if (lastState == State.afkingBeforeCuttingTree && getTree() != null) {
-            return State.cuttingTree;
         }
 
 
@@ -70,17 +80,24 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
     }
 
     private RSObject getTree() {
-        return Objects.methods.objects.getNearest(t -> t != null
-                && t.getName() != null
-                && t.getLocation() == treeTile
-                && !t.getName().contains("stump")
-                && t.getName().contains("tree")
+        RSObject patchObj = Objects.methods.objects.getNearest(t -> t != null
+            && t.getID() == treePatchId
         );
+
+
+        int faladorPatchVarpId = 529;
+        int faladorPatchVarp = clientLocalStorage.getVarpValueAt(faladorPatchVarpId);
+
+        for (int treeInPatchVarbit : treeInPatchVarbits) {
+            if (faladorPatchVarp == treeInPatchVarbit) {
+                l("There's a tree in the patch!");
+                return patchObj;
+            }
+        }
+        l("No tree found");
+        return null;
     }
 
-    // *******************************************************//
-    // MAIN LOOP
-    // *******************************************************//
     @Override
     public int loop() {
         if (!game.isLoggedIn()) {
@@ -184,15 +201,12 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
             g.drawString("Lvls Gained: " + (currentLVL - startLvl), 561,
                     coords[5]);
             g.drawString("XP Gained: " + gainedXP, 561, coords[6]);
-            g.drawString("XP To Next Level: "
-                            + skills.getExpToNextLevel(Skills.getIndex("woodcutting")),
-                    561, coords[8]);
             g.drawString("% To Next Level: "
                     + skills.getPercentToNextLevel(Skills
-                    .getIndex("woodcutting")), 561, coords[10]);
+                    .getIndex("woodcutting")), 561, coords[8]);
 
-            g.drawString("State: " + lastState, 561, coords[12]);
-            g.drawString("Animation: " + players.getMyPlayer().getAnimation(), 561, coords[13]);
+            g.drawString("State: " + lastState, 561, coords[10]);
+            g.drawString("Animation: " + players.getMyPlayer().getAnimation(), 561, coords[11]);
         }
     }
 }
