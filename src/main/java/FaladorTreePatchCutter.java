@@ -11,6 +11,9 @@ import java.awt.*;
 import java.util.Arrays;
 import java.util.Locale;
 
+import static rsb.methods.Bank.BANK_BOOTHS;
+import static rsb.methods.MethodProvider.methods;
+
 
 @ScriptManifest(authors = { "dginovker" }, name = "Falador Tree Patch Cutter", version = 1.04, description = "<html><head>"
         + "</head><body>"
@@ -41,6 +44,7 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
             ScriptManifest.class);
 
     private final RSArea outsideBank = new RSArea(new RSTile(3008, 3362), new RSTile(3012, 3360));
+    private final RSArea aroundPatch = new RSArea(new RSTile(3001, 3375), new RSTile(3002, 3371));
     private final RSTile treeTile = new RSTile(3004, 3373);
     private final int treePatchId = 8389;
     private final int[] treeInPatchVarbits = {
@@ -53,25 +57,26 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
         if (players.getMyPlayer().getAnimation() == 867) {
             return State.cuttingTree;
         }
-        if (getTree() == null && Inventory.methods.inventory.getCount() > 20 || Inventory.methods.inventory.getCount() >= 28) {
-            return State.goingToBank;
-        }
-        if (Inventory.methods.inventory.getCount() <= 20 && MethodProvider.methods.calc.distanceTo(treeTile) > 5) {
-            return State.walkingToPatch;
-        }
-        if (outsideBank.contains(Players.methods.players.getMyPlayer().getLocation())) {
-            return State.openingBank;
-        }
-        if (Bank.methods.bank.isOpen()) {
+        if (methods.bank.isOpen()) {
             return State.bankingItems;
         }
-        if (getTree() == null && MethodProvider.methods.calc.distanceTo(treeTile) <= 5) {
+        int canSeeBankY = 3362;
+        if (methods.players.getMyPlayer().getLocation().getY() <= canSeeBankY) {
+            return State.openingBank;
+        }
+        if (lastState != State.openingBank && getTree() == null && methods.inventory.getCount() > 20 || methods.inventory.getCount() >= 28) {
+            return State.goingToBank;
+        }
+        if (methods.inventory.getCount() <= 20 && methods.calc.distanceTo(treeTile) > 5) {
+            return State.walkingToPatch;
+        }
+        if (getTree() == null && methods.calc.distanceTo(treeTile) <= 5) {
             return State.waitingForTree;
         }
         if (lastState == State.afkingBeforeCuttingTree && getTree() != null) {
             return State.clickingTree;
         }
-        if (getTree() != null && MethodProvider.methods.calc.distanceTo(treeTile) <= 5) {
+        if (getTree() != null && methods.calc.distanceTo(treeTile) <= 5) {
             return State.afkingBeforeCuttingTree;
         }
 
@@ -80,7 +85,7 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
     }
 
     private RSObject getTree() {
-        RSObject patchObj = Objects.methods.objects.getNearest(t -> t != null
+        RSObject patchObj = methods.objects.getNearest(t -> t != null
             && t.getID() == treePatchId
         );
 
@@ -107,21 +112,40 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
         lastState = getState();
         switch (lastState) {
             case goingToBank:
+                if (players.getMyPlayer().isLocalPlayerMoving()) {
+                    return 900;
+                }
+                walking.walkTo(outsideBank.getRandomTile());
                 break;
             case openingBank:
+                RSObject bankBooth = methods.objects.getNearest(BANK_BOOTHS);
+                if (!bankBooth.isOnScreen()) {
+                    camera.turnTo(bankBooth);
+                }
+                bankBooth.doClick();
                 break;
             case bankingItems:
+                bank.depositAll();
                 break;
             case walkingToPatch:
+                walking.walkTo(aroundPatch.getRandomTile());
                 break;
             case waitingForTree:
-                break;
+                return 300;
             case afkingBeforeCuttingTree:
+                return 1000 * random(1, 10);
+            case clickingTree:
+                RSObject tree = getTree();
+                if (tree != null) {
+                    ctx.tiles.doAction(tree.getLocation(), "Chop down");
+                    sleep(random(0, 2000));
+                    mouse.moveOffScreen();
+                }
                 break;
             case cuttingTree:
-                break;
+                return 300;
             case unknown:
-                break;
+                return 300;
             default:
                 l("Unknown state");
         }
@@ -146,16 +170,16 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
 
     public void onRepaint(final Graphics g) {
         // Draw bot's mouse
-        if (Players.methods.mouse.isPressed()) {
+        if (methods.mouse.isPressed()) {
             g.setColor(new Color(255, 255, 0, 175));
-            g.fillOval(Players.methods.mouse.getLocation().getX(), Players.methods.mouse.getLocation().getY(), 7, 7);
+            g.fillOval(methods.mouse.getLocation().getX(), methods.mouse.getLocation().getY(), 7, 7);
             g.setColor(new Color(0, 255, 255, 175));
-            g.drawOval(Players.methods.mouse.getLocation().getX(), Players.methods.mouse.getLocation().getY(), 7, 7);
+            g.drawOval(methods.mouse.getLocation().getX(), methods.mouse.getLocation().getY(), 7, 7);
         } else {
             g.setColor(new Color(0, 255, 255, 175));
-            g.fillOval(Players.methods.mouse.getLocation().getX(), Players.methods.mouse.getLocation().getY(), 7, 7);
+            g.fillOval(methods.mouse.getLocation().getX(), methods.mouse.getLocation().getY(), 7, 7);
             g.setColor(new Color(255, 255, 0, 175));
-            g.drawOval(Players.methods.mouse.getLocation().getX(), Players.methods.mouse.getLocation().getY(), 7, 7);
+            g.drawOval(methods.mouse.getLocation().getX(), methods.mouse.getLocation().getY(), 7, 7);
         }
         long runTime = 0;
         long seconds = 0;
