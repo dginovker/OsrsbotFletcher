@@ -15,7 +15,7 @@ import static rsb.methods.Bank.BANK_BOOTHS;
 import static rsb.methods.MethodProvider.methods;
 
 
-@ScriptManifest(authors = { "dginovker" }, name = "Falador Tree Patch Cutter", version = 1.04, description = "<html><head>"
+@ScriptManifest(authors = { "dginovker" }, name = "Falador Tree Patch Cutter", version = 1.06, description = "<html><head>"
         + "</head><body>"
         + "<center><strong><h2>dginovker's Falador Tree Patch Cutter</h2></strong></center>"
         + "<center><strong>Start the script in Falador by the Tree Patch with an axe and a tree ready<br />"
@@ -34,7 +34,6 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
         bankingItems,
         walkingToPatch,
         waitingForTree,
-        afkingBeforeCuttingTree,
         clickingTree,
         cuttingTree,
         unknown
@@ -54,6 +53,9 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
     private int startLvl = 0;
 
     private State getState() {
+        if (interfaces.canContinue()) {
+            return State.clickingTree;
+        }
         if (players.getMyPlayer().getAnimation() == 867) {
             return State.cuttingTree;
         }
@@ -64,7 +66,7 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
         if (methods.players.getMyPlayer().getLocation().getY() <= canSeeBankY && methods.inventory.getCount() > 20) {
             return State.openingBank;
         }
-        if (lastState != State.openingBank && getTree() == null && methods.inventory.getCount() > 20 || methods.inventory.getCount() >= 28) {
+        if (lastState != State.openingBank && (getTree() == null && methods.inventory.getCount() > 20 || methods.inventory.getCount() >= 28)) {
             return State.goingToBank;
         }
         if (methods.inventory.getCount() <= 20 && methods.calc.distanceTo(treeTile) > 5) {
@@ -73,20 +75,16 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
         if (getTree() == null && methods.calc.distanceTo(treeTile) <= 5) {
             return State.waitingForTree;
         }
-        if ((lastState == State.afkingBeforeCuttingTree || inventory.getCount() == 0) && getTree() != null) {
+        if (getTree() != null) {
             return State.clickingTree;
         }
-        if (getTree() != null && methods.calc.distanceTo(treeTile) <= 5) {
-            return State.afkingBeforeCuttingTree;
-        }
-
 
         return State.unknown;
     }
 
     private RSObject getTree() {
         RSObject patchObj = methods.objects.getNearest(t -> t != null
-            && t.getID() == treePatchId
+                && t.getID() == treePatchId
         );
 
 
@@ -142,8 +140,6 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
                 walking.walkTo(aroundPatch.getRandomTile());
                 break;
             case waitingForTree:
-                return 300;
-            case afkingBeforeCuttingTree:
                 return 1000 * random(1, 50);
             case clickingTree:
                 RSObject tree = getTree();
@@ -155,15 +151,17 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
                 break;
             case cuttingTree:
                 // right click anywhere on the screen every 2-5 minutes
-                
-                return 300;
+
+                return 1000 * random(1, 50);
             case unknown:
                 return 300;
             default:
                 l("Unknown state");
-        }
+                break;
+            }
 
         return 3000;
+
     }
 
     @Override
