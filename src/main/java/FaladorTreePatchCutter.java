@@ -3,19 +3,16 @@ import rsb.methods.*;
 import rsb.script.Script;
 import rsb.script.ScriptManifest;
 import rsb.wrappers.RSArea;
-import rsb.wrappers.RSNPC;
 import rsb.wrappers.RSObject;
 import rsb.wrappers.RSTile;
 
 import java.awt.*;
-import java.util.Arrays;
-import java.util.Locale;
 
 import static rsb.methods.Bank.BANK_BOOTHS;
 import static rsb.methods.MethodProvider.methods;
 
 
-@ScriptManifest(authors = { "dginovker" }, name = "Falador Tree Patch Cutter", version = 1.06, description = "<html><head>"
+@ScriptManifest(authors = { "dginovker" }, name = "Falador Tree Patch Cutter", version = 1.08, description = "<html><head>"
         + "</head><body>"
         + "<center><strong><h2>dginovker's Falador Tree Patch Cutter</h2></strong></center>"
         + "<center><strong>Start the script in Falador by the Tree Patch with an axe and a tree ready<br />"
@@ -29,7 +26,7 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
     }
 
     private enum State {
-        goingToBank,
+        walkingToBank,
         openingBank,
         bankingItems,
         walkingToPatch,
@@ -51,8 +48,13 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
     };
     private int startXP = 0;
     private int startLvl = 0;
+    private long lastClickTime = 0; // To prevent 5 minute log
 
     private State getState() {
+        if (methods.interfaces.getComponent(220, 16).isValid()) {
+            l("Noticeboard visible");
+            return State.walkingToBank;
+        }
         if (interfaces.canContinue()) {
             return State.clickingTree;
         }
@@ -67,7 +69,7 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
             return State.openingBank;
         }
         if (lastState != State.openingBank && (getTree() == null && methods.inventory.getCount() > 20 || methods.inventory.getCount() >= 28)) {
-            return State.goingToBank;
+            return State.walkingToBank;
         }
         if (methods.inventory.getCount() <= 20 && methods.calc.distanceTo(treeTile) > 5) {
             return State.walkingToPatch;
@@ -87,8 +89,8 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
                 && t.getID() == treePatchId
         );
 
-
         int faladorPatchVarpId = 529;
+        l("Getting varp");
         int faladorPatchVarp = clientLocalStorage.getVarpValueAt(faladorPatchVarpId);
 
         for (int treeInPatchVarbit : treeInPatchVarbits) {
@@ -99,12 +101,18 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
         return null;
     }
 
+    private boolean isWalking() {
+        return walking.getDestination() != null && walking.getDestination().equals(players.getMyPlayer().getLocation());
+    }
+
     @Override
     public int loop() {
         if (!game.isLoggedIn()) {
             return 2000;
         }
 
+        l(String.valueOf(walking.getDestination()));
+        l(String.valueOf(getMyPlayer().getLocation()));
         try {
             lastState = getState();
         } catch (Exception e) {
@@ -113,25 +121,37 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
             lastState = State.unknown;
         }
         switch (lastState) {
-            case goingToBank:
-                if (players.getMyPlayer().isLocalPlayerMoving()) {
+            case walkingToBank:
+                if (inventory.getCount() < 28) {
+                    if (methods.calc.distanceTo(treeTile) <= 5) {
+                        sleep(random(1000, 15000));
+                    }
+                    if (getTree() != null) {
+                        return 100;
+                    }
+                }
+                if (isWalking()) {
                     return 900;
                 }
                 walking.walkTo(outsideBank.getRandomTile());
                 break;
             case openingBank:
-                if (players.getMyPlayer().isLocalPlayerMoving()) {
+                if (isWalking()) {
                     return 900;
                 }
                 RSObject bankBooth = methods.objects.getNearest(BANK_BOOTHS);
                 if (!bankBooth.isOnScreen()) {
                     camera.turnTo(bankBooth);
                 }
-                bankBooth.doClick();
+                if (!bankBooth.doClick()) {
+                    walking.walkTo(outsideBank.getRandomTile());
+                }
                 break;
             case bankingItems:
                 bank.depositAll();
-                bank.close();
+                if (random(0, 100) < 50) {
+                    bank.close();
+                }
                 break;
             case walkingToPatch:
                 if (players.getMyPlayer().isLocalPlayerMoving()) {
@@ -150,9 +170,19 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
                 }
                 break;
             case cuttingTree:
-                // right click anywhere on the screen every 2-5 minutes
+                sleep(1000 * random(1, 50));
+                if (players.getMyPlayer().getAnimation() == 867 && lastClickTime + 200_000 < System.currentTimeMillis()) {
+                    // right click somewhere random on the canvas
+                    int x = random(0, getBot().getCanvas().getWidth());
+                    int y = random(0, getBot().getCanvas().getHeight());
+                    mouse.move(x, y);
+                    mouse.click(false);
+                    if (random(0, 100) < 50) {
+                        mouse.moveOffScreen();
+                    }
+                    lastClickTime = System.currentTimeMillis();
+                }
 
-                return 1000 * random(1, 50);
             case unknown:
                 return 300;
             default:
