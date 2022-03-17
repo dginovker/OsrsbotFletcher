@@ -1,3 +1,4 @@
+import net.runelite.api.GameObject;
 import rsb.event.listener.PaintListener;
 import rsb.methods.*;
 import rsb.script.Script;
@@ -164,6 +165,10 @@ public class FaladorTreePatchCutter extends Script implements PaintListener {
             case clickingTree:
                 RSObject tree = getTree();
                 if (tree != null) {
+                    RSObject treepatch = methods.objects.getNearest(8389);
+                    if (!treepatch.getLocation().isOnScreen()) {
+                        camera.turnTo(treepatch);
+                    }
                     ctx.tiles.doAction(tree.getLocation(), "Chop down");
                     sleep(random(0, 2000));
                     mouse.moveOffScreen();
