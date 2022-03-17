@@ -46,7 +46,11 @@ public class Fletcher extends Script implements PaintListener {
     private long lastClickTime = 0; // To prevent 5 minute log
 
     private State getState() {
-        if (bank.isOpen() && inventory.getCount() > 1 || inventory.getCount(YEW_LOG_ID) == 0 && inventory.getCount(BOWSTRING_ID) == 0) {
+        if (getMyPlayer().isAnimating()) {
+            return State.fletching;
+        }
+        if (bank.isOpen() && (inventory.getCount(KNIFE_ID) == 1 && inventory.getCount(YEW_LONGBOW_U_ID) > 0 || inventory.getCount(YEW_LONGBOW_ID) > 0)
+                || !bank.isOpen() && inventory.getCount(YEW_LOG_ID) == 0 && !bank.isOpen() && inventory.getCount(BOWSTRING_ID) == 0) {
             return State.depositing;
         }
         if (bank.isOpen() && bank.getCount(YEW_LOG_ID) > 0) {
@@ -57,9 +61,6 @@ public class Fletcher extends Script implements PaintListener {
         }
         if (inventory.contains(YEW_LOG_ID)) {
             return State.startingLogFletch;
-        }
-        if (getMyPlayer().isAnimating()) {
-            return State.fletching;
         }
         return State.unknown;
     }
@@ -77,40 +78,61 @@ public class Fletcher extends Script implements PaintListener {
             e.printStackTrace();
             lastState = State.unknown;
         }
-        switch (lastState) {
-            case startingLogFletch:
-                // use knife on logs
-                // todo antiban - select different log, change order of use
-                inventory.useItem(YEW_LOG_ID, KNIFE_ID);
-                // click yew longbow (u) widget - 270, 16
-                methods.interfaces.getComponent(270, 16).doClick();
-                canHitSpace = true;
-                break;
-            case startingStringing:
-                break;
-            case fletching:
-                sleep(random(10000, 20000));
-                break;
-            case depositing:
-                bank.open();
-                bank.depositAllExcept(KNIFE_ID);
-                break;
-            case withdrawingLogs:
-                bank.withdraw(YEW_LOG_ID, 0);
-                bank.close();
-                break;
-            case withdrawingStringAndUs:
-                bank.withdraw(BOWSTRING_ID, 13);
-                bank.withdraw(YEW_LONGBOW_U_ID, 13);
-                break;
-            case unknown:
-                return 300;
-            default:
-                l("Unknown state");
-                break;
+        try  {
+            switch (lastState) {
+                case startingLogFletch:
+                    if (random(0, 1) == 0) {
+                        inventory.useItem(YEW_LOG_ID, KNIFE_ID);
+                    } else {
+                        inventory.useItem(KNIFE_ID, YEW_LOG_ID);
+                    }
+                    long starttime = System.currentTimeMillis();
+                    while (!methods.interfaces.getComponent(270, 16).isValid() && starttime + 5000 > System.currentTimeMillis()) {
+                        sleep(200);
+                    }
+                    if (!canHitSpace || random(0, 100) > 90) {
+                        // click yew longbow (u) widget - 270, 16
+                        methods.interfaces.getComponent(270, 16).doClick();
+                    } else {
+                        keyboard.pressKey(' ');
+                    }
+                    canHitSpace = true;
+                    break;
+                case startingStringing:
+                    break;
+                case fletching:
+                    if (random(0, 100) > 95) {
+                        sleep(random(10000, 20000));
+                    }
+                    break;
+                case depositing:
+                    if (inventory.isItemSelected()) {
+                        inventory.clickSelectedItem();
+                    }
+                    bank.open();
+                    bank.deposit(YEW_LONGBOW_U_ID, 0);
+                    bank.deposit(YEW_LONGBOW_ID, 0);
+                    break;
+                case withdrawingLogs:
+                    bank.withdraw(YEW_LOG_ID, 0);
+                    bank.close();
+                    break;
+                case withdrawingStringAndUs:
+                    bank.withdraw(BOWSTRING_ID, 13);
+                    bank.withdraw(YEW_LONGBOW_U_ID, 13);
+                    break;
+                case unknown:
+                    return 300;
+                default:
+                    l("Unknown state");
+                    break;
             }
+        }
+        catch (Exception e) {
+            l("Exception while doing state: " + e.getMessage());
+        }
 
-        return 3000;
+        return 300;
 
     }
 
